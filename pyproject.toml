@@ -14,6 +14,12 @@ dependencies = [
     "pydantic>=2.5.0",
 ]
 
+[project.scripts]
+rexha = "rexha.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]

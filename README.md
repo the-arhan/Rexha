@@ -46,8 +46,9 @@ cd rexha
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
+# Install dependencies and package in editable mode
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 3. Launching Rexha
@@ -55,7 +56,7 @@ pip install -r requirements.txt
 Run Rexha directly as a module:
 
 ```powershell
-python -m src.rexha
+python -m rexha
 ```
 
 - Rexha will launch as a compact pill in the bottom-right corner of your screen.

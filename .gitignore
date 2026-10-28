@@ -28,6 +28,7 @@ env/
 build/
 dist/
 *.spec
+*.egg-info/
 
 # Runtime data
 data/*
