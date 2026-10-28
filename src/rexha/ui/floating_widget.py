@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-from PySide6.QtCore import Qt, QPoint, Signal, QRect
-from PySide6.QtGui import QMouseEvent, QPainter, QColor, QPen, QBrush, QGuiApplication
+from PySide6.QtCore import Qt, QPoint, QPointF, Signal, QRect
+from PySide6.QtGui import QMouseEvent, QPainter, QColor, QPen, QBrush, QPolygonF, QGuiApplication
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -19,6 +19,43 @@ from rexha.core.state_machine import AssistantState
 from rexha.ui.theme import Theme
 
 logger = logging.getLogger(__name__)
+
+
+class GeometricInsignia(QWidget):
+    """Custom geometric chevron/diamond insignia for Rexha brand identity."""
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setFixedSize(14, 14)
+        self._accent_color = QColor(Theme.LIME)
+
+    def set_color(self, hex_color: str) -> None:
+        self._accent_color = QColor(hex_color)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Draw minimalist sharp geometric polygon
+        points = [
+            QPointF(7.0, 1.0),   # Top
+            QPointF(13.0, 7.0),  # Right
+            QPointF(7.0, 13.0),  # Bottom
+            QPointF(1.0, 7.0),   # Left
+        ]
+        poly = QPolygonF(points)
+
+        pen = QPen(self._accent_color, 1.5)
+        painter.setPen(pen)
+        painter.setBrush(QBrush(QColor(18, 21, 31, 200)))
+        painter.drawPolygon(poly)
+
+        # Inner electric point
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(self._accent_color))
+        painter.drawRect(5, 5, 4, 4)
+        painter.end()
 
 
 class StateIndicatorDot(QWidget):
@@ -37,9 +74,9 @@ class StateIndicatorDot(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # Outer glow
+        # Outer subtle glow
         glow_color = QColor(self._color)
-        glow_color.setAlpha(60)
+        glow_color.setAlpha(45)
         painter.setBrush(QBrush(glow_color))
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(0, 0, 12, 12)
@@ -77,37 +114,40 @@ class FloatingWidget(QWidget):
 
     def _build_ui(self) -> None:
         """Create the compact widget layout."""
-        self.setFixedSize(160, 56)
+        self.setFixedSize(170, 58)
 
-        # Drop shadow
+        # Drop shadow for depth
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 180))
+        shadow.setColor(QColor(0, 0, 0, 220))
         shadow.setOffset(0, 4)
         self.setGraphicsEffect(shadow)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(12, 8, 12, 6)
-        main_layout.setSpacing(2)
+        main_layout.setSpacing(3)
 
-        # Top row: Dot + Brand + Expand Button
+        # Top row: Insignia + Brand + Dot + Expand Button
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
         top_row.setSpacing(6)
 
-        self.dot = StateIndicatorDot(self)
-        top_row.addWidget(self.dot)
+        self.insignia = GeometricInsignia(self)
+        top_row.addWidget(self.insignia)
 
         self.brand_label = QLabel("REXHA", self)
         self.brand_label.setObjectName("BrandLabel")
         top_row.addWidget(self.brand_label)
+
+        self.dot = StateIndicatorDot(self)
+        top_row.addWidget(self.dot)
 
         top_row.addStretch()
 
         self.expand_btn = QPushButton("▲", self)
         self.expand_btn.setObjectName("ExpandBtn")
         self.expand_btn.setFixedSize(16, 16)
-        self.expand_btn.setToolTip("Open Rexha Panel")
+        self.expand_btn.setToolTip("Open Rexha Panel (Ctrl+Space)")
         self.expand_btn.clicked.connect(self.clicked.emit)
         top_row.addWidget(self.expand_btn)
 
@@ -118,7 +158,7 @@ class FloatingWidget(QWidget):
         self.status_label.setObjectName("StatusLabel")
         main_layout.addWidget(self.status_label)
 
-        # Audio Level Bar (Subtle 2px bar at the bottom)
+        # Audio Level Bar (Restrained 2px line)
         self.audio_meter = QProgressBar(self)
         self.audio_meter.setFixedHeight(2)
         self.audio_meter.setRange(0, 100)
@@ -127,11 +167,12 @@ class FloatingWidget(QWidget):
         self.audio_meter.setStyleSheet(
             f"""
             QProgressBar {{
-                background-color: transparent;
+                background-color: {Theme.BORDER};
                 border: none;
+                border-radius: 1px;
             }}
             QProgressBar::chunk {{
-                background-color: {Theme.CYAN};
+                background-color: {Theme.LIME};
                 border-radius: 1px;
             }}
             """
@@ -145,10 +186,10 @@ class FloatingWidget(QWidget):
         label = Theme.get_state_label(state)
 
         self.dot.set_color(color)
+        self.insignia.set_color(color)
         self.status_label.setText(label)
         self.setStyleSheet(Theme.get_compact_widget_stylesheet(state))
 
-        # Audio bar only active in LISTENING
         if state != AssistantState.LISTENING:
             self.audio_meter.setValue(0)
 
@@ -168,7 +209,6 @@ class FloatingWidget(QWidget):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if event.buttons() == Qt.LeftButton and self._drag_position is not None:
             new_pos = event.globalPosition().toPoint() - self._drag_position
-            # Constrain to screen boundary
             screen = QGuiApplication.screenAt(event.globalPosition().toPoint())
             if screen:
                 geom: QRect = screen.availableGeometry()
@@ -183,10 +223,8 @@ class FloatingWidget(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
             if not self._is_dragging:
-                # Direct click without drag -> trigger expand
                 self.clicked.emit()
             else:
-                # Drag completed -> broadcast new coordinate for saving
                 pos = self.pos()
                 self.position_changed.emit(pos.x(), pos.y())
             self._drag_position = None

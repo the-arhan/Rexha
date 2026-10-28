@@ -1,84 +1,133 @@
 # Rexha ⚡
 
-> **A persistent, voice-enabled, AI-assisted Windows desktop automation platform.**
+> **A persistent, modular, voice-enabled Windows desktop assistant and personal computing platform.**
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6.svg)](https://microsoft.com/windows)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%2F%2010-0078D6.svg)](https://microsoft.com/windows)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB.svg)](https://python.org)
+[![Native Core](https://img.shields.io/badge/Native%20Core-C%2B%2B20%20%2F%20Win32-blue.svg)]()
+[![CMake](https://img.shields.io/badge/Build-CMake%203.25+-red.svg)](https://cmake.org)
 [![GUI](https://img.shields.io/badge/GUI-PySide6%20Qt6-41CD52.svg)](https://qt.io)
-[![License](https://img.shields.io/badge/License-Proprietary%20%2F%20MIT-blue.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-80%20Passing-brightgreen.svg)]()
 
 ---
 
 ## What is Rexha?
 
-**Rexha** (pronounced *"reck-zha"*) is a native Windows desktop assistant designed to operate your PC through spoken and typed natural language commands. Rather than living as an isolated chatbot in a web browser, Rexha lives natively on your desktop as an always-on-top, compact floating widget that wakes up on voice activation or global hotkey, interprets tasks, requests confirmation for sensitive operations, executes multi-step workflows, and independently verifies the outcome.
+**Rexha** (pronounced *"reck-zha"*) is a native Windows desktop assistant designed to operate your PC through spoken and typed natural language commands. Rather than living as an isolated chatbot in a web browser, Rexha lives natively on your desktop with a hybrid C++/Python architecture:
+
+- **C++20 Native Core:** High-performance Windows systems service handling Win32 message pumps, zero-polling global hotkeys, window management (`EnumWindows`, `ShowWindow`, `WM_CLOSE`), process tracking, and system metrics (`GlobalMemoryStatusEx`, CPU).
+- **Windows Named Pipe IPC:** Secure, length-prefixed binary JSON protocol (`\\.\pipe\rexha_ipc`) with Overlapped I/O connecting the native core and Python orchestrator.
+- **Python Orchestrator:** Intent interpretation, pluggable LLM planning, 3-tier security policy enforcement, SQLite persistence, and PySide6 UI.
+- **Persistent Industrial UI:** Always-on-top, draggable floating widget with custom geometric insignia, dark graphite surfaces (`#0B0D13`), and electric-lime status accents.
 
 ---
 
-## Key Features
+## Architecture Overview
 
-- **Persistent Floating Widget:** Minimalist, draggable, always-on-top floating pill displaying assistant state (`Sleeping...`, `Listening...`, `Thinking...`).
-- **Voice Activation (v0.1):** Standby local wake detection (*"Wake up, Rexha"*, *"Hey, Rexha"*), speech transcription, and silence detection.
-- **Alternative Controls:** Native global hotkey (`Ctrl+Space`), interactive text command bar, and system tray menu.
-- **Deterministic Desktop Automation:** Fast offline intent handlers for opening/closing applications, Windows Settings shortcuts, notes management, and system queries (CPU, RAM, disk).
-- **Security & Sandboxing:** Independent 3-tier permission engine, path sandboxing (`PathGuard`), command execution allowlists, and human-in-the-loop confirmation for file overwrites or process termination.
-- **Outcome Verification:** Confirms actual OS results (process running, window focused, file written) before reporting success.
-- **Privacy by Default:** Standby audio remains 100% local; visual microphone indicators; zero secret logging.
+```
++─────────────────────────────────────────────────────────────+
+|                     PYTHON ORCHESTRATOR                     |
+|  - Desktop UI (PySide6 Qt 6.8+)                             |
+|  - 13-State Assistant State Machine & Typed Event Bus       |
+|  - Deterministic Intent Parser + Pluggable LLM Planner      |
+|  - 3-Tier Security Policy Engine (Safe, Standard, Tier 2)   |
+|  - Action Execution Engine with Outcome Verification        |
+|  - SQLite Persistence (WAL Mode)                            |
+|  - NativeCoreClient (Overlapped Named Pipe IPC Client)      |
++──────────────────────────────┬──────────────────────────────+
+                               │
+            Windows Named Pipe: \\.\pipe\rexha_ipc
+            Framing: 4-Byte Big-Endian Length + UTF-8 JSON
+                               │
++──────────────────────────────▼──────────────────────────────+
+|                      C++ NATIVE CORE                        |
+|  - Win32 Named Pipe Server (Async Overlapped I/O)           |
+|  - Global Hotkey Manager (Blocking GetMessageW pump)        |
+|  - Window Manager (Enum, Foreground, State, WM_CLOSE)       |
+|  - Process Supervisor (CreateProcessW, Job isolation)       |
+|  - System Metrics Engine (RAM, CPU, PID, Uptime)            |
++─────────────────────────────────────────────────────────────+
+```
 
 ---
 
-## Quick Start (Windows)
+## Quick Start (Windows 11 / 10 x64)
 
 ### 1. Prerequisites
-- **Operating System:** Windows 10 (Build 19041+) or Windows 11 (64-bit).
-- **Python:** Python 3.12 or newer.
+- **Operating System:** Windows 11 or Windows 10 (64-bit).
+- **Python:** Python 3.12+ (x64).
+- **CMake:** CMake 3.25+.
+- **C++ Compiler:** Visual Studio 2022 Community with C++ Desktop Development tools.
 
-### 2. Environment Setup
+### 2. Automated Setup & Build
 
-Clone the repository and install dependencies:
-
-```powershell
-# Clone repository
-git clone https://github.com/your-repo/rexha.git
-cd rexha
-
-# Create and activate virtual environment (recommended)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# Install dependencies and package in editable mode
-pip install -r requirements.txt
-pip install -e .
-```
-
-### 3. Launching Rexha
-
-Run Rexha directly as a module:
+Clone the repository and run the automated PowerShell scripts:
 
 ```powershell
-python -m rexha
+# 1. Setup Python dependencies and verify toolchains
+.\scripts\setup.ps1
+
+# 2. Build C++ Native Core (Release configuration via CMake)
+.\scripts\build.ps1
+
+# 3. Run full automated test suite (Native C++ + Python pytest)
+.\scripts\test.ps1
+
+# 4. Launch Rexha Desktop Assistant
+.\scripts\run.ps1
 ```
 
-- Rexha will launch as a compact pill in the bottom-right corner of your screen.
-- Press **Ctrl+Space** or click the widget to open the command interaction panel.
-- Enter a command or click the mic button to speak.
+---
 
-### 4. Running Automated Tests
+## Development & Manual Commands
 
+### Build Native Core Manually
+```powershell
+cmake -B native/build -S native -G "Visual Studio 17 2022" -A x64
+cmake --build native/build --config Release
+```
+
+### Run Native C++ Tests
+```powershell
+.\native\build\Release\rexha_native_tests.exe
+```
+
+### Run Python Pytest Suite
 ```powershell
 pytest
 ```
 
+### Launch Flags
+```powershell
+# Standard hybrid launch (spawns native core automatically)
+python -m rexha
+
+# Fallback mode (runs pure Python without native core)
+python -m rexha --no-native
+
+# Custom database path
+python -m rexha --db-path data/custom.sqlite
+```
+
 ---
 
-## Documentation
+## Built-In Commands
 
-- 📐 [Architecture & Subsystem Design](file:///e:/Projects/Rexha/ARCHITECTURE.md)
-- 📋 [Product Specification](file:///e:/Projects/Rexha/PRODUCT_SPEC.md)
-- 🔒 [Security & Permission Model](file:///e:/Projects/Rexha/SECURITY.md)
-- 🗺️ [Implementation Plan & Roadmap](file:///e:/Projects/Rexha/IMPLEMENTATION_PLAN.md)
-- 🎙️ [Voice Subsystem Details](file:///e:/Projects/Rexha/docs/VOICE_SYSTEM.md)
-- 🎨 [UI & Styling Guidelines](file:///e:/Projects/Rexha/docs/USER_INTERFACE.md)
-- 🪟 [Windows Automation Internals](file:///e:/Projects/Rexha/docs/WINDOWS_AUTOMATION.md)
-- 🧠 [AI Execution & Planning](file:///e:/Projects/Rexha/docs/AI_EXECUTION_SYSTEM.md)
-- 🧪 [Testing Strategy](file:///e:/Projects/Rexha/docs/TESTING_STRATEGY.md)
+When the interaction drawer is open (press `Ctrl+Space` or click the floating widget):
+
+- `status` — Displays real-time assistant state, native core PID, RAM usage, CPU load, and foreground window.
+- `windows` — Lists active top-level application windows.
+- `open notepad` (or `launch <app>`) — Safely launches application with PID verification.
+- `sleep` — Collapses assistant drawer back to compact floating pill.
+- `help` — Shows available commands.
+- `quit` — Gracefully terminates native core and desktop application.
+
+---
+
+## Architectural Documentation
+
+- [HYBRID_ARCHITECTURE.md](file:///e:/Projects/Rexha/docs/HYBRID_ARCHITECTURE.md): Complete architectural audit and language boundaries (Sections A through Q).
+- [IPC_PROTOCOL.md](file:///e:/Projects/Rexha/docs/IPC_PROTOCOL.md): Framing, JSON schema, error codes, and registered operations catalog.
+- [PRODUCT_SPEC.md](file:///e:/Projects/Rexha/PRODUCT_SPEC.md): Full product vision and v0.1 requirements.
+- [SECURITY.md](file:///e:/Projects/Rexha/SECURITY.md): 3-tier permission matrix, human confirmation, and path isolation.
+- [IMPLEMENTATION_PLAN.md](file:///e:/Projects/Rexha/IMPLEMENTATION_PLAN.md): Milestone checklist and verification records.

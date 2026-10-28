@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from PySide6.QtCore import Qt, Signal, QRect
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent, QGuiApplication, QColor
 from PySide6.QtWidgets import (
     QWidget,
@@ -24,24 +24,24 @@ logger = logging.getLogger(__name__)
 
 
 class MessageCard(QFrame):
-    """Visual bubble for user commands and assistant responses."""
+    """Visual card for user commands and assistant responses."""
 
     def __init__(self, sender: str, text: str, is_user: bool = False, parent: QWidget | None = None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(4)
 
         # Header
         header = QLabel(sender, self)
-        color = Theme.CYAN if is_user else Theme.VIOLET
-        header.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: bold;")
+        color = Theme.LIME if is_user else Theme.VIOLET
+        header.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: 700; letter-spacing: 0.8px;")
         layout.addWidget(header)
 
         # Body
         body = QLabel(text, self)
         body.setWordWrap(True)
-        body.setStyleSheet(f"color: {Theme.TEXT_MAIN}; font-size: 13px; line-height: 1.4;")
+        body.setStyleSheet(f"color: {Theme.TEXT_MAIN}; font-size: 13px; line-height: 1.45;")
         layout.addWidget(body)
 
         bg = Theme.BG_SURFACE if is_user else Theme.BG_CARD
@@ -63,7 +63,7 @@ class InteractionPanel(QWidget):
     command_submitted = Signal(str)
     mic_toggled = Signal()
     collapse_requested = Signal()
-    action_confirmed = Signal(bool)  # True = approved, False = rejected
+    action_confirmed = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -82,11 +82,11 @@ class InteractionPanel(QWidget):
 
     def _build_ui(self) -> None:
         """Construct the panel layout."""
-        self.setFixedSize(400, 520)
+        self.setFixedSize(420, 540)
 
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(25)
-        shadow.setColor(QColor(0, 0, 0, 200))
+        shadow.setColor(QColor(0, 0, 0, 230))
         shadow.setOffset(0, 6)
         self.setGraphicsEffect(shadow)
 
@@ -134,7 +134,7 @@ class InteractionPanel(QWidget):
         # 3. Confirmation Prompt Banner (Hidden by default)
         self.confirm_frame = QFrame(self)
         self.confirm_frame.setStyleSheet(
-            f"background-color: {Theme.BG_SURFACE}; border-top: 1px solid {Theme.STATE_COLORS[AssistantState.AWAITING_CONFIRMATION]}; padding: 10px;"
+            f"background-color: {Theme.BG_SURFACE}; border-top: 1px solid {Theme.AMBER}; padding: 10px;"
         )
         confirm_layout = QVBoxLayout(self.confirm_frame)
         self.confirm_text = QLabel("Action requires your approval:", self.confirm_frame)
@@ -144,12 +144,12 @@ class InteractionPanel(QWidget):
 
         btn_row = QHBoxLayout()
         self.btn_approve = QPushButton("Approve", self.confirm_frame)
-        self.btn_approve.setStyleSheet("background-color: #10B981; color: white; border-radius: 4px; padding: 4px 12px; font-weight: bold;")
+        self.btn_approve.setStyleSheet(f"background-color: {Theme.LIME}; color: #000000; border-radius: 6px; padding: 5px 14px; font-weight: bold;")
         self.btn_approve.clicked.connect(lambda: self._handle_confirmation(True))
         btn_row.addWidget(self.btn_approve)
 
         self.btn_cancel = QPushButton("Cancel", self.confirm_frame)
-        self.btn_cancel.setStyleSheet("background-color: #EF4444; color: white; border-radius: 4px; padding: 4px 12px; font-weight: bold;")
+        self.btn_cancel.setStyleSheet(f"background-color: {Theme.BG_CARD}; color: {Theme.TEXT_MAIN}; border: 1px solid {Theme.BORDER}; border-radius: 6px; padding: 5px 14px;")
         self.btn_cancel.clicked.connect(lambda: self._handle_confirmation(False))
         btn_row.addWidget(self.btn_cancel)
 
@@ -167,13 +167,13 @@ class InteractionPanel(QWidget):
         self.mic_btn = QPushButton("🎙", input_container)
         self.mic_btn.setObjectName("MicBtn")
         self.mic_btn.setFixedSize(36, 36)
-        self.mic_btn.setToolTip("Activate Voice Listening")
+        self.mic_btn.setToolTip("Toggle Voice Listening")
         self.mic_btn.clicked.connect(self.mic_toggled.emit)
         input_layout.addWidget(self.mic_btn)
 
         self.command_input = QLineEdit(input_container)
         self.command_input.setObjectName("CommandInput")
-        self.command_input.setPlaceholderText("Speak or type a command... (e.g. 'Open VS Code')")
+        self.command_input.setPlaceholderText("Command or question... (e.g. 'status', 'open notepad', 'sleep')")
         self.command_input.returnPressed.connect(self._on_submit)
         input_layout.addWidget(self.command_input, 1)
 
@@ -204,11 +204,9 @@ class InteractionPanel(QWidget):
         self.confirm_frame.show()
 
     def add_message(self, sender: str, text: str, is_user: bool = False) -> None:
-        """Append a message bubble to conversation history."""
+        """Append a message card to conversation history."""
         card = MessageCard(sender, text, is_user, self.scroll_content)
-        # Insert before bottom stretch
         self.history_layout.insertWidget(self.history_layout.count() - 1, card)
-        # Scroll to bottom
         QGuiApplication.processEvents()
         self.scroll_area.verticalScrollBar().setValue(
             self.scroll_area.verticalScrollBar().maximum()
@@ -220,11 +218,11 @@ class InteractionPanel(QWidget):
         color = Theme.get_state_color(state)
         self.state_badge.setText(label.upper())
         self.state_badge.setStyleSheet(
-            f"background-color: {Theme.BG_SURFACE_HOVER}; color: {color}; border: 1px solid {color}; border-radius: 10px; padding: 3px 10px; font-size: 11px; font-weight: bold;"
+            f"background-color: {Theme.BG_CARD}; color: {color}; border: 1px solid {color}; border-radius: 10px; padding: 3px 10px; font-size: 11px; font-weight: bold;"
         )
 
         if state == AssistantState.LISTENING:
-            self.mic_btn.setStyleSheet(f"background-color: {Theme.CYAN}; color: #000000; border-radius: 8px; font-size: 14px;")
+            self.mic_btn.setStyleSheet(f"background-color: {Theme.LIME}; color: #000000; border-radius: 8px; font-size: 14px;")
         else:
             self.mic_btn.setStyleSheet("")
 
